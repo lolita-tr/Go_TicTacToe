@@ -9,6 +9,12 @@ import (
 	"sync"
 )
 
+const (
+	ResultWin  string = "win"
+	ResultLose string = "lose"
+	ResultDraw string = "draw"
+)
+
 type ServiceImpl struct {
 	userRepository storage.UserRepository
 	gameRepository storage.GameRepository
@@ -77,11 +83,11 @@ func (gs *ServiceImpl) MakeMovePlayers(request MoveRequest, gameID string) (*Mov
 
 	if win {
 		if game.GetPlayerUUID(game.CurrentPlayer()) == game.Player1 {
-			gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, "win")
-			gs.gameRepository.SaveResult(context.Background(), game.Player2, gameID, "lose")
+			gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, ResultWin)
+			gs.gameRepository.SaveResult(context.Background(), game.Player2, gameID, ResultLose)
 		} else if game.GetPlayerUUID(game.CurrentPlayer()) == game.Player2 {
-			gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, "lose")
-			gs.gameRepository.SaveResult(context.Background(), game.Player2, gameID, "win")
+			gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, ResultLose)
+			gs.gameRepository.SaveResult(context.Background(), game.Player2, gameID, ResultWin)
 		}
 
 		response := &MoveResponse{
@@ -92,12 +98,12 @@ func (gs *ServiceImpl) MakeMovePlayers(request MoveRequest, gameID string) (*Mov
 	}
 
 	if game.Table.IsFull() {
-		gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, "draw")
-		gs.gameRepository.SaveResult(context.Background(), game.Player2, gameID, "draw")
+		gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, ResultDraw)
+		gs.gameRepository.SaveResult(context.Background(), game.Player2, gameID, ResultDraw)
 
 		response := &MoveResponse{
 			Board:  game.GetBoard(),
-			Result: "draw",
+			Result: ResultDraw,
 		}
 		return response, nil
 	}
@@ -121,7 +127,7 @@ func (gs *ServiceImpl) MakeMoveBot(request MoveRequest, gameID string) (*MoveRes
 	}
 
 	if win {
-		if err = gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, "win"); err != nil {
+		if err = gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, ResultWin); err != nil {
 			return nil, errors.Wrap(err, "failed to save game result")
 		}
 	}
@@ -134,7 +140,7 @@ func (gs *ServiceImpl) MakeMoveBot(request MoveRequest, gameID string) (*MoveRes
 		}
 
 		if winRobot {
-			err = gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, "lose")
+			err = gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, ResultLose)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to save game result")
 			}
@@ -145,13 +151,13 @@ func (gs *ServiceImpl) MakeMoveBot(request MoveRequest, gameID string) (*MoveRes
 			return response, nil
 		}
 	} else { //draw
-		err = gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, "draw")
+		err = gs.gameRepository.SaveResult(context.Background(), game.Player1, gameID, ResultDraw)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to save game result")
 		}
 		response := &MoveResponse{
 			Board:  game.GetBoard(),
-			Result: "draw",
+			Result: ResultDraw,
 		}
 		return response, nil
 	}
