@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html lang="ru">
+<head>
+    <title>Tic Tac Toe</title>
+    <style>
+        td {
+            width: 50px; height: 50px;
+            text-align: center;
+            font-size: 24px;
+            border: 1px solid #000;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div id="auth">
+    <h3>Регистрация и вход</h3>
+    <input type="text" id="login" placeholder="Login" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="signup()">Регистрация</button>
+    <button onclick="authorize()">Войти</button>
+    <p id="authStatus"></p>
+</div>
+
+<div id="gameMode">
+    <h4>Выберите режим:</h4>
+    <button onclick="startGameWithBot()">Играть с ботом</button>
+    <button onclick="showUserGameForm()">Играть с человеком</button>
+</div>
+
+<div id="userGameForm" style="display:none;">
+    <input type="text" id="opponentLogin" placeholder="Логин соперника">
+    <button onclick="startGameWithUser()">Начать игру</button>
+</div>
+
+<div id="gameBot" style="display: none;">
+    <h3>Крестики-нолики</h3>
+    <table id="boardBot"></table>
+    <button onclick="resetGameBot()">Новая игра</button>
+    <h4>Игрок - О</h4>
+    <h4>Бот   - Х</h4>
+    <div id="statusBOt"></div>
+</div>
+
+<div id="gameUser" style="display: none;">
+    <h3>Крестики-нолики</h3>
+    <table id="boardUser"></table>
+    <button onclick="resetGameUser()">Новая игра</button>
+    <h4>Игрок 1 - О</h4>
+    <h4>Игрок 2 - Х</h4>
+    <div id="status"></div>
+</div>
+
+
+<script>
+    let gameId = null
+
+    function getAuthHeader() {
+        const token = localStorage.getItem("accessToken");
+        console.log("accessToken:", token);
+
+        if (!token) return {};
+
+        return {
+            "Authorization": `Bearer ${token}`
+        };
+    }
+
+
+    function showUserGameForm() {
+        document.getElementById("userGameForm").style.display = "block";
+    }
+
+    // Игра с ботом
+    async function startGameWithBot() {
+        const res = await fetch("/new/bot", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...getAuthHeader(),
+            },
+        });
+
+        if (!res.ok) {
+            alert("Не удалось создать игру с ботом");
+            return;
+        }
+
+        const data = await res.json();
+        gameId = data.game_id;
+        document.getElementById("gameBot").style.display = "block";
+        document.getElementById("gameUser").style.display = "none";
+        await renderBoardBot();
+    }
+
+    // Игра с другим пользователем
+    async function startGameWithUser() {
+        const opponent = document.getElementById("opponentLogin").value;
+
+        const res = await fetch("/new/user", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...getAuthHeader(),
+            },
+            body: JSON.stringify({ opponent_login: opponent }),
+        });
+
+        if (!res.ok) {
+            alert("Не удалось создать игру с другим пользователем");
+            return;
+        }
+
+        const data = await res.json();
+        gameId = data.game_id;
+        document.getElementById("gameUser").style.display = "block";
+        document.getElementById("gameBot").style.display = "none";
+        await renderBoardUser();
+    }
+
+
+    async function signup(){
+        login = document.getElementById("login").value;
+        password = document.getElementById("password").value;
+
+        const res = await fetch("/signup", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({login, password})
+        });
+
+        if (res.ok) {
+            alert("Успешная регистрация");
+        }else{
+            alert("Ошибка регистрации");
+        }
+    }
+
+    async function authorize() {
+        login = document.getElementById("login").value;
+        password = document.getElementById("password").value;
+
+        const res = await fetch("/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                login: login,
+                password: password
+            })
+        });
+
+        if (!res.ok){
+            alert("Ошибка авторизации");
+            return;
+        }
+
+        const result = await res.json();
+
+        localStorage.setItem("accessToken", result.access_token);
+        localStorage.setItem("refreshToken", result.refresh_token);
+
+        document.getElementById("auth").style.display = "none";
+        document.getElementById("gameMode").style.display = "block";
+    }
+
+    async function getBoard() {
+        const res = await fetch(`/board?id=${gameId}`, {
+            headers: getAuthHeader()
+        });
+        return await res.json();
+    }
+
+    async function makeMoveBot(row, col) {
+        const res = await fetch(`/move/bot?id=${gameId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json",
+                ...getAuthHeader()
+            },
+            body: JSON.stringify({ row, col }),
+        });
+
+        const result = await res.json();
+        await renderBoardBot();
+
+        // if (result.winner === 3) {
+        //     const status = document.getElementById("status");
+        //     status.textContent = "Ничья🤝";
+        //     disableBoard();
+        // } else if (result.winner !== ""){
+        //     const status = document.getElementById("status");
+        //     status.textContent = result.winner === 1 ? "Победил Робот (🤖)" : "Победил человек (O)";
+        //     disableBoard();
+        // }
+
+        if (result.winner !== "") {
+            const status = document.getElementById("status");
+            if (result.winner === "robot") {
+                status.textContent = "Победил Робот🤖"
+            } else if (result.winner === "draw") {
+                status.textContent = "Ничья🤝"
+            } else if (result.winner === "person") {
+                status.textContent = "Победило человечетво🧑‍💻"
+            }
+            disableBoard();
+        }
+    }
+
+    async function makeMoveUser(row, col) {
+        const res = await fetch(`/move/users?id=${gameId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json",
+                ...getAuthHeader()
+            },
+            body: JSON.stringify({ row, col }),
+        });
+
+        const result = await res.json();
+        await renderBoardUser();
+
+        if (result.winner !== "") {
+            const status = document.getElementById("status");
+            status.textContent = result.winner === 1 ? "Победил 2 (X)" : "Победил 1 (O)";
+            disableBoard();
+        }
+    }
+
+    function disableBoard() {
+        const cells = document.querySelectorAll("td");
+        cells.forEach(cell => {
+            cell.onclick = null;
+        });
+    }
+
+    async function resetGameBot() {
+        await fetch(`/reset?id=${gameId}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...getAuthHeader(),
+            },
+        });
+        document.getElementById("status").textContent = "";
+        await renderBoardBot();
+    }
+
+    async function resetGameUser() {
+        await fetch(`/reset?id=${gameId}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...getAuthHeader(),
+            },
+        });
+        document.getElementById("status").textContent = "";
+        await renderBoardUser();
+    }
+
+    async function renderBoardBot() {
+        const board = await getBoard();
+        const table = document.getElementById("boardBot");
+        table.innerHTML = "";
+        board.forEach((row, i) => {
+            const tr = document.createElement("tr");
+            row.forEach((cell, j) => {
+                const td = document.createElement("td");
+                td.textContent = cell === 1 ? "X" : (cell === 2 ? "O" : "");
+                td.onclick = () => makeMoveBot(i, j);
+                tr.appendChild(td);
+            });
+            table.appendChild(tr);
+        });
+    }
+
+    async function renderBoardUser() {
+        const board = await getBoard();
+        const table = document.getElementById("boardUser");
+        table.innerHTML = "";
+        board.forEach((row, i) => {
+            const tr = document.createElement("tr");
+            row.forEach((cell, j) => {
+                const td = document.createElement("td");
+                td.textContent = cell === 1 ? "X" : (cell === 2 ? "O" : "");
+                td.onclick = () => makeMoveUser(i, j);
+                tr.appendChild(td);
+            });
+            table.appendChild(tr);
+        });
+    }
+
+</script>
+</body>
+</html>
+
+

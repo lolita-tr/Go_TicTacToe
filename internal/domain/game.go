@@ -6,9 +6,13 @@ import (
 )
 
 type Game struct {
-	Table  *Table
-	Player int
-	mu     sync.Mutex
+	Table   *Table
+	Player  int
+	Player1 string
+	Player2 string
+	Mode    string
+	Result  string
+	mu      sync.Mutex
 }
 
 var (
@@ -34,6 +38,17 @@ func (g *Game) CurrentPlayer() int {
 	defer g.mu.Unlock()
 
 	return g.Player
+}
+
+func (g *Game) GetPlayerUUID(player int) string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if player == 2 {
+		return g.Player1
+	}
+
+	return g.Player2
 }
 
 func (g *Game) MakeMove(row, col int) (bool, error) {
